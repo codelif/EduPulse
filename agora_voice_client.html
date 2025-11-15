@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agora RTC Stream Listener</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .status.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .param-item {
+            background: #f5f5f5;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .param-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .param-value {
+            font-family: 'Courier New', monospace;
+            color: #333;
+            word-break: break-all;
+            font-size: 14px;
+        }
+
+        #remote-streams {
+            margin-top: 20px;
+        }
+
+        .stream-container {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .stream-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .audio-indicator {
+            width: 100%;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 48px;
+        }
+
+        .volume-bars {
+            display: flex;
+            gap: 5px;
+            align-items: flex-end;
+            height: 60px;
+        }
+
+        .volume-bar {
+            width: 8px;
+            background: white;
+            border-radius: 4px;
+            transition: height 0.1s ease;
+        }
+
+        .logs {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        .log-time {
+            color: #858585;
+            margin-right: 10px;
+        }
+
+        .log-info { color: #4fc3f7; }
+        .log-success { color: #81c784; }
+        .log-error { color: #e57373; }
+        .log-warning { color: #ffb74d; }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Agora RTC Stream Listener</h1>
+        <p class="subtitle">Real-time audio/video stream monitoring</p>
+
+        <div id="status" class="status info">
+            <div class="status-indicator"></div>
+            <span id="status-text">Initializing...</span>
+        </div>
+
+        <div class="params-grid">
+            <div class="param-item">
+                <div class="param-label">App ID</div>
+                <div class="param-value" id="display-appId">-</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Channel</div>
+                <div class="param-value" id="display-channel">-</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">UID</div>
+                <div class="param-value" id="display-uid">-</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Agent UID</div>
+                <div class="param-value" id="display-agentUid">-</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Token</div>
+                <div class="param-value" id="display-token">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="connect-btn" onclick="connectToChannel()">Connect</button>
+            <button id="disconnect-btn" onclick="disconnectFromChannel()" disabled>Disconnect</button>
+        </div>
+
+        <div id="remote-streams"></div>
+
+        <div class="logs" id="logs"></div>
+    </div>
+
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+    <script>
+        let client;
+        let params = {};
+        const logs = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = { timestamp, message, type };
+            logs.push(logEntry);
+            
+            const logsContainer = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${timestamp}]</span><span class="log-${type}">${message}</span>`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+            statusElement.className = `status ${type}`;
+            statusText.textContent = message;
+            log(message, type);
+        }
+
+        function parseURLParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            params.appId = urlParams.get('appId');
+            params.channel = urlParams.get('channel');
+            params.token = urlParams.get('token');
+            params.uid = urlParams.get('uid');
+            params.agentUid = urlParams.get('agentUid');
+
+            // Display parameters
+            document.getElementById('display-appId').textContent = params.appId || 'Not provided';
+            document.getElementById('display-channel').textContent = params.channel || 'Not provided';
+            document.getElementById('display-uid').textContent = params.uid || 'Auto-generated';
+            document.getElementById('display-agentUid').textContent = params.agentUid || 'Not provided';
+            document.getElementById('display-token').textContent = params.token ? params.token.substring(0, 20) + '...' : 'Not provided';
+
+            // Validate required parameters
+            if (!params.appId || !params.channel) {
+                updateStatus('Missing required parameters (appId, channel)', 'error');
+                log('Required URL parameters: ?appId=xxx&channel=xxx&token=xxx&uid=xxx&agentUid=xxx', 'warning');
+                return false;
+            }
+
+            updateStatus('Parameters loaded successfully', 'success');
+            return true;
+        }
+
+        async function connectToChannel() {
+            if (!parseURLParams()) {
+                return;
+            }
+
+            try {
+                document.getElementById('connect-btn').disabled = true;
+                updateStatus('Connecting to Agora RTC...', 'info');
+
+                // Create Agora client
+                client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+                // Event handlers
+                client.on("user-published", async (user, mediaType) => {
+                    log(`User ${user.uid} published ${mediaType}`, 'success');
+                    
+                    await client.subscribe(user, mediaType);
+                    log(`Subscribed to user ${user.uid}'s ${mediaType}`, 'success');
+
+                    if (mediaType === "video") {
+                        const remoteVideoTrack = user.videoTrack;
+                        const playerContainer = createPlayerContainer(user.uid, 'video');
+                        remoteVideoTrack.play(playerContainer);
+                        updateStatus(`Playing video from user ${user.uid}`, 'success');
+                    }
+
+                    if (mediaType === "audio") {
+                        const remoteAudioTrack = user.audioTrack;
+                        remoteAudioTrack.play();
+                        createAudioIndicator(user.uid);
+                        updateStatus(`Playing audio from user ${user.uid}`, 'success');
+                    }
+                });
+
+                client.on("user-unpublished", (user, mediaType) => {
+                    log(`User ${user.uid} unpublished ${mediaType}`, 'warning');
+                    if (mediaType === "video") {
+                        removePlayerContainer(user.uid);
+                    }
+                });
+
+                client.on("user-joined", (user) => {
+                    log(`User ${user.uid} joined the channel`, 'info');
+                });
+
+                client.on("user-left", (user) => {
+                    log(`User ${user.uid} left the channel`, 'warning');
+                    removePlayerContainer(user.uid);
+                });
+
+                // Join channel
+                const uid = params.uid ? parseInt(params.uid) : null;
+                await client.join(params.appId, params.channel, params.token || null, uid);
+                
+                log(`Successfully joined channel: ${params.channel}`, 'success');
+                log(`Your UID: ${client.uid}`, 'info');
+                updateStatus(`Connected to channel: ${params.channel}`, 'success');
+
+                document.getElementById('disconnect-btn').disabled = false;
+
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                updateStatus(`Connection failed: ${error.message}`, 'error');
+                document.getElementById('connect-btn').disabled = false;
+            }
+        }
+
+        async function disconnectFromChannel() {
+            if (client) {
+                await client.leave();
+                log('Disconnected from channel', 'warning');
+                updateStatus('Disconnected', 'warning');
+                document.getElementById('remote-streams').innerHTML = '';
+                document.getElementById('connect-btn').disabled = false;
+                document.getElementById('disconnect-btn').disabled = true;
+            }
+        }
+
+        function createPlayerContainer(uid, type) {
+            const remoteStreams = document.getElementById('remote-streams');
+            
+            let container = document.getElementById(`player-${uid}`);
+            if (!container) {
+                container = document.createElement('div');
+                container.id = `player-${uid}`;
+                container.className = 'stream-container';
+                
+                const label = document.createElement('div');
+                label.className = 'stream-label';
+                label.textContent = `User ${uid}${params.agentUid && uid == params.agentUid ? ' (Agent)' : ''}`;
+                container.appendChild(label);
+
+                remoteStreams.appendChild(container);
+            }
+
+            return container;
+        }
+
+        function createAudioIndicator(uid) {
+            const container = createPlayerContainer(uid, 'audio');
+            
+            if (!container.querySelector('.audio-indicator')) {
+                const indicator = document.createElement('div');
+                indicator.className = 'audio-indicator';
+                indicator.innerHTML = '🔊 Audio Stream';
+                container.appendChild(indicator);
+            }
+        }
+
+        function removePlayerContainer(uid) {
+            const container = document.getElementById(`player-${uid}`);
+            if (container) {
+                container.remove();
+            }
+        }
+
+        // Initialize on page load
+        window.onload = () => {
+            log('Agora RTC Listener initialized', 'info');
+            log('Add URL parameters: ?appId=xxx&channel=xxx&token=xxx&uid=xxx&agentUid=xxx', 'info');
+            parseURLParams();
+        };
+
+        // Auto-connect if all required params are present
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('appId') && urlParams.get('channel')) {
+                setTimeout(() => {
+                    log('Auto-connecting with URL parameters...', 'info');
+                    connectToChannel();
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
